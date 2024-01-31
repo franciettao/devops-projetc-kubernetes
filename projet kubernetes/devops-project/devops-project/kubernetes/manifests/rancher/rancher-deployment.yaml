@@ -1,0 +1,41 @@
+# rancher-deployment.yaml
+apiVersion: rancher.cattle.io/v1
+kind: Cluster
+metadata:
+  name: my-rancher-cluster
+spec:
+  networkPlugin: canal
+  addonModules:
+  - rancher/local-path-provisioner:v0.0.15
+  rkeConfig:
+    machineTypes:
+    - machineTypeName: general
+      rootFS:
+        size: 20G
+      diskSize: 50G
+      cpu: 2
+      memory: 2048
+    nodes:
+    - address: <node-1-ip>
+      user: rancher
+      role:
+      - controlplane
+      - etcd
+      - worker
+      sshKeys:
+      - <ssh-public-key>
+    - address: <node-2-ip>
+      user: rancher
+      role:
+      - controlplane
+      - etcd
+      - worker
+      sshKeys:
+      - <ssh-public-key>
+    - address: <node-3-ip>
+      user: rancher
+      role:
+      - worker
+      sshKeys:
+      - <ssh-public-key>
+    kubernetesVersion: v1.22.4-ranch

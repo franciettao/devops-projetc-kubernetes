@@ -1,0 +1,40 @@
+# ansible/playbooks/infrastructure/configure-k8s-cluster.yaml
+---
+- name: Configure K8s cluster
+  hosts: all
+  become: true
+  vars:
+    k8s_version: "1.21.2"
+    k8s_repo: "https://packages.cloud.google.com/apt"
+    k8s_archive: "kubernetes-xenial_${k8s_version}_amd64.deb"
+  tasks:
+    - name: Add K8s APT repository
+      apt_repository:
+        repo: "deb ${k8s_repo} kubernetes-xenial main"
+        state: present
+
+    - name: Download K8s package
+      get_url:
+        url: "https://storage.googleapis.com/kubernetes-release/release/${k8s_version}/${k8s_archive}"
+        dest: "/tmp/{{ k8s_archive }}"
+        validate_certs: yes
+
+    - name: Install K8s package
+      apt:
+        name: "/tmp/{{ k8s_archive }}"
+        state: present
+
+    - name: Disable update notifications for K8s
+      systemd_service:
+        name: apt-daily.service
+        enabled: no
+
+    - name: Ensure K8s services are running
+      service:
+        name:
+          - kubelet
+          - kubeadm
+          - kubectl
+        state: started
+        enabled: yes
+...

@@ -1,0 +1,54 @@
+#touch ansible/playbooks/applications/deploy-applications.yaml
+---
+- hosts: application_servers
+  become: true
+  vars:
+    app_user: "{{ lookup('env', 'APP_USER') | default('application') }}"
+    app_group: "{{ lookup('env', 'APP_GROUP') | default('application') }}"
+
+  tasks:
+    - name: Ensure Git is installed
+      apt:
+        name: git
+        state: present
+      when: ansible_os_family == 'Debian'
+
+    - name: Clone the application repository
+      git:
+        repo: "{{ git_repo }}"
+        dest: "{{ app_path }}"
+        version: "{{ git_branch | default('main') }}"
+        update: yes
+        clone: yes
+        accept_hostkey: yes
+      environment:
+        GIT_TERMINAL_PROMPT: "0"
+      become_user: root
+
+    - name: Set the correct permissions for the application directory
+      file:
+        path: "{{ app_path }}"
+        owner: "{{ app_user }}"
+        group: "{{ app_group }}"
+        mode: "0775"
+      become_user: root
+
+    - name: Install application dependencies
+      pip:
+        requirements: "{{ app_path }}/requirements.txt"
+        virtualenv: "{{ app_path }}/venv"
+        virtualenv_python: python3
+      become_user: "{{ app_user }}"
+
+    - name: Run database migrations
+      command: "{{ app_path }}/manage.py migrate"
+      become_user: "{{ app_user }}"
+      args:
+        chdir: "{{ app_path }}"
+
+    - name: Restart the application service
+      service:
+        name: "{{ app_service }}"
+        state: restarted
+      become_user: root
+...

@@ -1,0 +1,226 @@
+#ansible/playbooks/infrastructure/secure-cluster.yaml
+---
+- name: Secure Cluster
+  hosts: all
+  become: yes
+  vars:
+    ansible_python_interpreter: "/usr/bin/python3"
+  tasks:
+    - name: Update packages
+      apt:
+        update_cache: yes
+        upgrade: "dist"
+      when: ansible_os_family == "Debian"
+
+    - name: Install epel repo
+      yum:
+        name: "https://dl.fedoraproject.org/pub/epel/epel-release-latest-{{ ansible_lsb.codename }}.noarch.rpm"
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Install firewall
+      yum:
+        name: firewalld
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Enable and start firewall
+      service:
+        name: firewalld
+        enabled: yes
+        state: started
+      when: ansible_os_family == "RedHat"
+
+    - name: Allow necessary ports
+      firewalld:
+        port: "{{ item }}"
+        permanent: yes
+        state: enabled
+      loop:
+        - 22
+        - 80
+        - 443
+      when: ansible_os_family == "RedHat"
+
+    - name: Install fail2ban
+      yum:
+        name: fail2ban
+        state: present
+      when: ansible_os_family == "RedHat"
+
+    - name: Enable and start fail2ban
+      service:
+        name: fail2ban
+        enabled: yes
+        state: started
+      when: ansible_os_family == "RedHat"
+
+    - name: Install and configure Nginx
+      blockinfile:
+        path: /etc/nginx/nginx.conf
+        create: yes
+        block: |
+          user  nginx;
+          worker_processes  1;
+          error_log  /var/log/nginx/error.log warn;
+          pid        /var/run/nginx.pid;
+          
+          events {
+            worker_connections  1024;
+          }
+
+          http {
+            include       /etc/nginx/mime.types;
+            default_type  application/octet-stream;
+            log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                             '$status $body_bytes_sent "$http_referer" '
+                             '"$http_user_agent" "$http_x_forwarded_for"';
+            access_log  /var/log/nginx/access.log  main;
+            
+            sendfile        on;
+            #tcp_nopush     on;
+            keepalive_timeout  65;
+            
+            #gzip  on;
+            
+            include /etc/nginx/conf.d/*.conf;
+          }
+      when: ansible_os_family == "RedHat"
+
+    - name: Install and configure PostgreSQL
+      blockinfile:
+        path: /var/lib/pgsql/data/postgresql.conf
+        create: yes
+        block: |
+          data_directory = '/var/lib/pgsql/data'
+          hba_file = '/etc/postgresql/{{ postgresql_version }}/main/pg_hba.conf'
+          ident_file = '/etc/postgresql/{{ postgresql_version }}/main/pg_ident.conf'
+          external_pid_file = '/var/run/postgresql/{{ postgresql_version }}/main.pid'
+          unix_socket_directories = '/var/run/postgresql'
+          ssl = on
+          ssl_cert_file = '/etc/ssl/certs/ssl-cert-snakeoil.pem'
+          ssl_key_file = '/etc/ssl/private/ssl-cert-snakeoil.key'
+          ssl_ca_file = '/etc/ssl/certs/ca-certificates.crt'
+          ssl_ciphers = 'HIGH:!aNULL:!MD5'
+          ssl_prefer_server_ciphers = 'on'
+          shared_buffers = '256MB'
+          max_connections = 100
+          work_mem = '64MB'
+          maintenance_work_mem = '128MB'
+          effective_cache_size = '1GB'
+          log_destination = 'stderr'
+          logging_collector = on
+          log_directory = 'pg_log'
+          log_filename = 'postgresql-%Y-%m-%d_%H%M%S.log'
+          log_rotation_age = '1d'
+          log_rotation_size = '10MB'
+          log_truncate_on_rotation = 'on'
+          statistics_profiles_directory = 'pg_stat_tmp'
+          vacuum_cost_delay = '0'
+          vacuum_cost_page_hit = '1'
+          vacuum_cost_page_miss = '10'
+          vacuum_cost_page_dirty = '20'
+          autovacuum_vacuum_cost_delay = '20ms'
+          autovacuum_vacuum_cost_limit = '100'
+          autovacuum_naptime = '60s'
+          autovacuum_vacuum_scale_factor = '0.2'
+          autovacuum_analyze_scale_factor = '0.1'
+          autovacuum_freeze_max_age = 200000000
+          autovacuum_multixact_freeze_max_age = 400000000
+          autovacuum_vacuum_cost_limit = -1
+          random_page_cost = 4
+          effective_io_concurrency = 200
+          max_worker_processes = 8
+          max_parallel_workers_per_gather = 2
+          max_parallel_workers = 4
+          max_parallel_maintenance_workers = 2
+          min_parallel_index_scan_size = '512kB'
+          min_parallel_table_scan_size = '8MB'
+          parallel_leader_participation = on
+          dynamic_shared_memory_type = posix
+          vacuum_defer_cleanup_age = 0
+          autovacuum_max_workers = 3
+          autovacuum_vacuum_cost_limit = 2000
+          autovacuum_vacuum_cost_delay = 10ms
+          autovacuum_vacuum_scale_factor = 0.2
+          autovacuum_analyze_scale_factor = 0.1
+          autovacuum_freeze_max_age = 200000000
+          autovacuum_multixact_freeze_max_age = 400000000
+          autovacuum_vacuum_cost_limit = -1
+          random_page_cost = 4
+          effective_io_concurrency = 200
+          max_worker_processes = 8
+          max_parallel_workers_per_gather = 2
+          max_parallel_workers = 4
+          max_parallel_maintenance_workers = 2
+          min_parallel_index_scan_size = '512kB'
+          min_parallel_table_scan_size = '8MB'
+          parallel_leader_participation = on
+          dynamic_shared_memory_type = posix
+          vacuum_defer_cleanup_age = 0
+          autovacuum_max_workers = 3
+          autovacuum_vacuum_cost_limit = 2000
+          autovacuum_vacuum_cost_delay = 10ms
+          autovacuum_vacuum_scale_factor = 0.2
+          autovacuum_analyze_scale_factor = 0.1
+          autovacuum_freeze_max_age = 200000000
+          autovacuum_multixact_freeze_max_age = 400000000
+          autovacuum_vacuum_cost_limit = -1
+          random_page_cost = 4
+          effective_io_concurrency = 200
+          max_worker_processes = 8
+          max_parallel_workers_per_gather = 2
+          max_parallel_workers = 4
+          max_parallel_maintenance_workers = 2
+          min_parallel_index_scan_size = '512kB'
+          min_parallel_table_scan_size = '8MB'
+          parallel_leader_participation = on
+          dynamic_shared_memory_type = posix
+          vacuum_defer_cleanup_age = 0
+          autovacuum_max_workers = 3
+          autovacuum_vacuum_cost_limit = 2000
+          autovacuum_vacuum_cost_delay = 10ms
+          autovacuum_vacuum_scale_factor = 0.2
+          autovacuum_analyze_scale_factor = 0.1
+          autovacuum_freeze_max_age = 200000000
+          autovacuum_multixact_freeze_max_age = 400000000
+          autovacuum_vacuum_cost_limit = -1
+          random_page_cost = 4
+          effective_io_concurrency = 200
+          max_worker_processes = 8
+          max_parallel_workers_per_gather = 2
+          max_parallel_workers = 4
+          max_parallel_maintenance_workers = 2
+          min_parallel_index_scan_size = '512kB'
+          min_parallel_table_scan_size = '8MB'
+          parallel_leader_participation = on
+          dynamic_shared_memory_type = posix
+      when: ansible_os_family == "Debian"
+
+    - name: Install and configure Django
+      blockinfile:
+        path: /opt/project/project/settings.py
+        create: yes
+        block: |
+          DATABASES = {
+            'default': {
+              'ENGINE': 'django.db.backends.postgresql',
+              'NAME': '{{ postgresql_database }}',
+              'USER': '{{ postgresql_user }}',
+              'PASSWORD': '{{ postgresql_password }}',
+              'HOST': 'localhost',
+              'PORT': '5432',
+            }
+          }
+      when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"
+
+    - name: Restart services
+      service:
+        name: "{{ item }}"
+        enabled: yes
+        state: restarted
+      loop:
+        - nginx
+        - postgresql
+        - fail2ban
+      when: ansible_os_family == "RedHat" or ansible_os_family == "Debian"

@@ -1,0 +1,52 @@
+# ansible/playbooks/monitoring/additional-automation.yaml
+---
+- name: Additional automation for monitoring
+  hosts: all
+  become: yes
+  vars:
+    telegraf_script: "/usr/local/bin/telegraf-check-disk.sh"
+    telegraf_cron_file: "/etc/cron.d/telegraf"
+  tasks:
+    - name: Add script to check disk usage
+      copy:
+        dest: "{{ telegraf_script }}"
+        content: |
+          #!/bin/bash
+          df -h | awk 'NR>1 {print $5}' | sed 's/%//g' | while read usage; do
+            if [ $usage -gt 90 ]; then
+              echo "Disk usage is over 90% on $(hostname)" | mail -s "Disk Usage Alert" user@example.com
+            fi
+          done
+        mode: '0755'
+
+    - name: Add cron job to run script
+      cron:
+        name: Run disk usage check
+        hour: '*'
+        minute: '30'
+        job: "bash {{ telegraf_script }}"
+        state: present
+      notify:
+        - restart telegraf
+
+    - name: Allow telegraf to run sudo commands
+      lineinfile:
+        path: /etc/sudoers
+        line: 'telegraf ALL=(ALL) NOPASSWD: /usr/bin/df'
+
+    - name: Create telegraf cron file
+      template:
+        src: templates/telegraf-cron.j2
+        dest: "{{ telegraf_cron_file }}"
+
+    - name: Restart telegraf service
+      service:
+        name: telegraf
+        state: restarted
+  handlers:
+    - name: restart telegraf
+      service:
+        name: telegraf
+        state: restarted
+
+        

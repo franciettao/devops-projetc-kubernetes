@@ -1,0 +1,10 @@
+# dockerhub_token.txt
+# Copy the Docker Hub token into the image
+COPY dockerhub_token.txt /tmp/
+
+# Set the Docker Hub token as an environment variable
+ENV DOCKER_USERNAME <your Docker Hub username>
+ENV DOCKER_PASSWORD $(cat /tmp/dockerhub_token.txt)
+
+# Remove the token file
+RUN rm /tmp/dockerhub_token.txt

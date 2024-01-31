@@ -1,0 +1,4 @@
+# tokens/github_token.txt
+github_token=$(cat github_token.txt)
+# use the token, for example:
+curl -H "Authorization: token $github_token" https://api.github.com

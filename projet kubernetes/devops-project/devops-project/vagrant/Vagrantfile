@@ -1,0 +1,141 @@
+# vagrant/Vagrantfile
+# plugins
+# vagrant plugin install vagrant-hosts
+# vagrant plugin install vagrant-scp
+# vagrant plugin install vagrant-hostmanager
+DEFAULT_OS="generic-x64/ubuntu1804"
+BRIDGE_NET="10.1.1."
+SCRIPT_PATH="../../script/"
+servers=[
+  {
+    :hostname => "jenkins",
+    :ip => BRIDGE_NET + "150",
+    :ram => 4000,
+    :script => [
+      SCRIPT_PATH + "jenkins_install.sh"
+    ]
+  },
+  {
+    :hostname => "monitor",
+    :ip => BRIDGE_NET + "151",
+    :ram => 4000,
+    :script =>[
+      SCRIPT_PATH + "prometeus_install.sh",
+      SCRIPT_PATH + "grafana_install.sh"
+    ]
+  },
+  {
+    :hostname => "mastr",
+    :ip => BRIDGE_NET + "152",
+    :ram => 2000,
+    :script =>[
+      SCRIPT_PATH + "kubernetes_install.sh",
+      SCRIPT_PATH + "kubernetes_configure_master.sh",
+    ]
+  },
+  {
+    :hostname => "node1",
+    :ip => BRIDGE_NET + "153",
+    :ram => 2000,
+    :script =>[
+      SCRIPT_PATH + "kubernetes_install.sh"
+    ]
+  }
+]
+
+Vagrant.configure("2") do |config|
+  config.vm.box = DEFAULT_OS
+  config.hostmanager.enabled = true
+  config.hostmanager.manage_host = true
+  config.hostmanager.manage_guest = true
+  config.hostmanager.ignore_private_ip = false
+  
+  config.vm.provider "vmware_desktop" do |v|
+    v.memory = 2048
+    v.cpus = 2
+  end
+  
+  servers.each do |machine|
+    config.vm.define machine[:hostname] do |node|
+      node.vm.hostname = machine[:hostname]
+      node.vm.network :private_network, ip: machine[:ip]
+      node.vm.provision :hosts, :sync_hosts => true
+      
+      node.vm.provider :vmware_desktop do |vmware|
+        vmware.vmx["numvcpus"] = 2
+        vmware.vmx["memsize"] = machine[:ram]
+      end
+      machine[:script].each do |s|
+        node.vm.provision "shell", path: s
+      end 
+    end
+    
+    # # shared folders
+    # config.vm.synced_folder ".", "/vagrant", disabled: true
+    # if File.directory?("/vagrant/"+machine[:hdd_name]) then
+    #   config.vm.provision "mount hdd image" do |s|
+    #     s.inline = <<-EOF
+    #       mount -t vboxsf -o defaults /vagrant #{File.dirname(machine[:hdd_name])}
+    #       cp -Rf /vagrant/#{File.basename(machine[:hdd_name])}/* .
+    #     EOF
+    #   end
+    # else
+    #   config.vm.provision "copy hdd image" do |s|
+    #     s.inline = <<-EOF
+    #       cp -Rf /vagrant/#{machine[:hdd_name]} .
+    #     EOF
+    #   end
+    # end
+    
+    # set up the guest OS
+    # config.vm.provision "shell", path: "kubernetes_install.sh"
+    # config.vm.provision "shell", path: "kubernetes_configure_master.sh"
+    # config.vm.provision :file, source: 'kubernetes_configure_cluster.sh', destination: "kubernetes_configure_cluster.sh" if machine[:isMaster]
+    # config.vm.provision "shell", path: "kubernetes_start_services.sh"
+  end
+end
+
+#   end
+#   config.vm.define "jenkins" do |jenkins|
+#     jenkins.vm.hostname = "jenkins"
+#     jenkins.vm.provider :vmware_desktop do |vmware|
+#       vmware.vmx["numvcpus"] = 2
+#       vmware.vmx["memsize"] = 4096
+#     end
+#     # jenkins.vm.provision "shell", path: "kubernetes_install.sh"
+# 	#   jenkins.vm.provision "shell", path: "kubernetes_configure_master.sh"
+# 	#   jenkins.vm.provision :file, source: 'kubernetes_configure_cluster.sh', destination: "kubernetes_configure_cluster.sh"
+#   end
+
+#   config.vm.define "monitor" do |monitor|
+#     monitor.vm.hostname = "monitor"
+#     monitor.vm.provider :vmware_desktop do |vmware|
+#       vmware.vmx["numvcpus"] = 2
+#       vmware.vmx["memsize"] = 4096
+#     end
+  
+#   end
+
+#   config.vm.define "master" do |master|
+#     master.vm.hostname = "master"
+#     master.vm.provider :vmware_desktop do |vmware|
+#       vmware.vmx["numvcpus"] = 2
+#       vmware.vmx["memsize"] = 2048
+#     end
+#     # master.vm.provision "shell", path: "kubernetes_install.sh"
+# 	#   #master.vm.provision "shell", path: "kubernetes_configure_master.sh"
+# 	#   master.vm.provision :file, source: 'kubernetes_configure_cluster.sh', destination: "kubernetes_configure_cluster.sh"
+#   end
+
+#   (1..2).each do |i|
+#     config.vm.define "node-#{i}" do |node|
+#       node.vm.hostname = "node-#{i}"
+#       node.vm.provider :vmware_desktop do |vmware|
+#         vmware.vmx["numvcpus"] = 2
+#         vmware.vmx["memsize"] = 2048
+#       end
+#     #   node.vm.provision "shell", path: "kubernetes_install.sh"
+# 	    #node.vm.provision "shell", path: "kubernetes_join_cluster.sh"
+#     end
+#   end
+# end

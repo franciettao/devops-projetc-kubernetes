@@ -1,0 +1,53 @@
+# ansible/playbooks/monitoring/configure-monitoring.yaml
+---
+- name: Configure monitoring
+  hosts: monitoring_servers
+  become: true
+  tasks:
+    - name: Install monitoring dependencies
+      apt:
+        name: "{{ packages }}"
+        state: present
+      loop:
+        - apt-transport-https
+        - ca-certificates
+        - curl
+        - software-properties-common
+
+    - name: Add monitoring repository
+      apt_repository:
+        repo: "deb {{ repo_url }} {{ repo_key }}"
+        state: present
+        filename: monitoring_repo
+
+    - name: Update package list
+      apt:
+        update_cache: yes
+
+    - name: Install monitoring tools
+      apt:
+        name: "{{ monitoring_tools }}"
+        state: present
+      loop:
+        - prometheus
+        - node_exporter
+        - alertmanager
+
+    - name: Configure monitoring services
+      template:
+        src: /path/to/templates/{{ item }}
+        dest: /etc/{{ item }}
+      loop:
+        - prometheus.yml
+        - node_exporter.yml
+        - alertmanager.yml
+
+    - name: Enable and start monitoring services
+      service:
+        name: "{{ item }}"
+        enabled: yes
+        state: started
+      loop:
+        - prometheus
+        - node_exporter
+        - alertmanager
